@@ -191,6 +191,27 @@
   .status.expired .dot{ background:var(--alert); }
   .card.invalid .head{ filter:grayscale(0.6); }
   .card.invalid .photo{ filter:grayscale(0.8); }
+
+  /* --- Bind form --- */
+  #bindView{ display:none; flex-direction:column; padding:34px 26px; color:#F6F3EC; }
+  #bindView.show{ display:flex; }
+  #bindView .bind-title{ font-size:17px; font-weight:700; margin-bottom:6px; text-align:center; }
+  #bindView .bind-sub{ font-size:12.5px; color:rgba(246,243,236,0.6); text-align:center; margin-bottom:22px; line-height:1.6; }
+  #bindView label{ font-size:12px; color:rgba(246,243,236,0.75); margin-bottom:6px; display:block; }
+  #bindView input{
+    width:100%; padding:11px 12px; margin-bottom:16px;
+    border-radius:10px; border:1px solid rgba(246,243,236,0.25);
+    background:rgba(246,243,236,0.08); color:#F6F3EC; font-size:15px;
+    font-family:'Noto Sans TC', sans-serif;
+  }
+  #bindView input::placeholder{ color:rgba(246,243,236,0.35); }
+  #bindView button{
+    padding:12px; border-radius:10px; border:none;
+    background:var(--gold); color:var(--ink); font-weight:700; font-size:14.5px;
+    cursor:pointer; letter-spacing:0.04em;
+  }
+  #bindView button:disabled{ opacity:0.6; }
+  #bindMsg{ font-size:12.5px; color:#e6a08a; margin-top:12px; text-align:center; min-height:16px; }
 </style>
 </head>
 <body>
@@ -208,6 +229,18 @@
   <div class="card" id="errorView">
     <div class="err-title">找不到會員資料</div>
     <div class="err-sub" id="errorMsg">請確認您已完成入會申請並通過審核。<br>如有疑問請聯繫系友會管理員。</div>
+  </div>
+
+  <!-- 首次綁定表單 -->
+  <div class="card" id="bindView">
+    <div class="bind-title">首次使用・身份核對</div>
+    <div class="bind-sub">請輸入您入會申請時填寫的姓名與手機末4碼，<br>核對成功後即可綁定此LINE帳號，之後開啟即為秒開會員證。</div>
+    <label for="bindName">姓名</label>
+    <input id="bindName" type="text" placeholder="請輸入真實姓名">
+    <label for="bindPhone">手機末4碼</label>
+    <input id="bindPhone" type="tel" maxlength="4" placeholder="例如 1234">
+    <button id="bindSubmit" onclick="submitBind()">送出核對</button>
+    <div id="bindMsg"></div>
   </div>
 
   <div class="card" id="mainCard" style="display:none;">
@@ -255,7 +288,7 @@
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
   // ===== 設定區：請將下面這行換成您GAS Web App部署後拿到的網址 =====
-  const GAS_API_URL = "請貼上您的GAS Web App網址";
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxU3sB--QCBTbJtdbuqsJQArYlngvhfw-Rggp0E0PY2FNhvhIZc6Az59SVoiAsI_kNU7w/exec";
   const LIFF_ID = "2011085574-dzhAKIHb";
   // ================================================================
 
@@ -275,6 +308,7 @@
   }
 
   let currentMemberId = '';
+  let currentLineUserId = '';
 
   function tick(){
     document.getElementById('code').textContent = genCode(currentMemberId);
@@ -283,12 +317,16 @@
   }
 
   function showView(view){
-    ['loadingView','errorView','mainCard'].forEach(id=>{
+    ['loadingView','errorView','bindView','mainCard'].forEach(id=>{
       const el = document.getElementById(id);
-      if(id === view){ el.style.display = 'flex'; el.classList.add('show'); }
-      else { el.style.display = 'none'; el.classList.remove('show'); }
+      if(id === view){
+        el.style.display = (id === 'mainCard') ? 'block' : 'flex';
+        el.classList.add('show');
+      } else {
+        el.style.display = 'none';
+        el.classList.remove('show');
+      }
     });
-    if(view === 'mainCard'){ document.getElementById('mainCard').style.display = 'block'; }
   }
 
   function renderMember(data){
@@ -319,18 +357,50 @@
   }
 
   async function fetchMemberData(lineUserId){
+    currentLineUserId = lineUserId;
     try{
-      const res = await fetch(`${GAS_API_URL}?userId=${encodeURIComponent(lineUserId)}`);
+      const res = await fetch(`${GAS_API_URL}?action=query&userId=${encodeURIComponent(lineUserId)}`);
       const data = await res.json();
       if(data.found){
         renderMember(data);
       } else {
-        document.getElementById('errorMsg').innerHTML = '查無您的會員資料，請確認已完成入會申請並通過審核。<br>如有疑問請聯繫系友會管理員。';
-        showView('errorView');
+        showView('bindView');
       }
     }catch(err){
       document.getElementById('errorMsg').innerHTML = '系統暫時無法連線，請稍後再試。<br>如持續發生請聯繫系友會管理員。';
       showView('errorView');
+    }
+  }
+
+  async function submitBind(){
+    const name = document.getElementById('bindName').value.trim();
+    const phone = document.getElementById('bindPhone').value.trim();
+    const msgEl = document.getElementById('bindMsg');
+    const btn = document.getElementById('bindSubmit');
+
+    if(!name || phone.length !== 4){
+      msgEl.textContent = '請完整輸入姓名與手機末4碼';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '核對中...';
+    msgEl.textContent = '';
+
+    try{
+      const res = await fetch(`${GAS_API_URL}?action=bind&userId=${encodeURIComponent(currentLineUserId)}&name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}`);
+      const data = await res.json();
+      if(data.success){
+        showView('loadingView');
+        fetchMemberData(currentLineUserId);
+      } else {
+        msgEl.textContent = data.message || '核對失敗，請確認資料是否正確。';
+        btn.disabled = false;
+        btn.textContent = '送出核對';
+      }
+    }catch(err){
+      msgEl.textContent = '系統暫時無法連線，請稍後再試。';
+      btn.disabled = false;
+      btn.textContent = '送出核對';
     }
   }
 
