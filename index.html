@@ -170,48 +170,49 @@
     letter-spacing:0.05em;
   }
 
-  /* --- Loading / Error states --- */
+  /* --- Loading / Error states (card背景為淺色paper，文字需用深色系) --- */
   #loadingView, #errorView{
     display:none;
     flex-direction:column; align-items:center; gap:14px;
-    color:#F6F3EC; text-align:center; padding:60px 24px;
+    color:var(--ink); text-align:center; padding:60px 24px;
   }
   #loadingView.show, #errorView.show{ display:flex; }
   .spinner{
     width:34px; height:34px; border-radius:50%;
-    border:3px solid rgba(246,243,236,0.25);
-    border-top-color:var(--gold);
+    border:3px solid var(--line);
+    border-top-color:var(--mid);
     animation:spin 0.9s linear infinite;
   }
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  #errorView .err-title{ font-size:16px; font-weight:700; }
-  #errorView .err-sub{ font-size:13px; color:rgba(246,243,236,0.65); line-height:1.6; }
+  #errorView .err-title{ font-size:16px; font-weight:700; color:var(--ink); font-family:'Noto Serif TC', serif; }
+  #errorView .err-sub{ font-size:13px; color:#5a736f; line-height:1.6; }
 
   .status.expired{ background:rgba(179,67,46,0.15); color:var(--alert); border-color:rgba(179,67,46,0.35); }
   .status.expired .dot{ background:var(--alert); }
   .card.invalid .head{ filter:grayscale(0.6); }
   .card.invalid .photo{ filter:grayscale(0.8); }
 
-  /* --- Bind form --- */
-  #bindView{ display:none; flex-direction:column; padding:34px 26px; color:#F6F3EC; }
+  /* --- Bind form (card背景為淺色paper，文字需用深色系) --- */
+  #bindView{ display:none; flex-direction:column; padding:34px 26px; color:var(--ink); }
   #bindView.show{ display:flex; }
-  #bindView .bind-title{ font-size:17px; font-weight:700; margin-bottom:6px; text-align:center; }
-  #bindView .bind-sub{ font-size:12.5px; color:rgba(246,243,236,0.6); text-align:center; margin-bottom:22px; line-height:1.6; }
-  #bindView label{ font-size:12px; color:rgba(246,243,236,0.75); margin-bottom:6px; display:block; }
+  #bindView .bind-title{ font-size:17px; font-weight:700; margin-bottom:6px; text-align:center; color:var(--ink); font-family:'Noto Serif TC', serif; }
+  #bindView .bind-sub{ font-size:12.5px; color:#5a736f; text-align:center; margin-bottom:22px; line-height:1.6; }
+  #bindView label{ font-size:12px; color:#5a736f; margin-bottom:6px; display:block; font-weight:500; }
   #bindView input{
     width:100%; padding:11px 12px; margin-bottom:16px;
-    border-radius:10px; border:1px solid rgba(246,243,236,0.25);
-    background:rgba(246,243,236,0.08); color:#F6F3EC; font-size:15px;
+    border-radius:10px; border:1.5px solid var(--line);
+    background:#ffffff; color:var(--ink); font-size:15px;
     font-family:'Noto Sans TC', sans-serif;
   }
-  #bindView input::placeholder{ color:rgba(246,243,236,0.35); }
+  #bindView input:focus{ outline:none; border-color:var(--mid); }
+  #bindView input::placeholder{ color:#a8b8b4; }
   #bindView button{
     padding:12px; border-radius:10px; border:none;
-    background:var(--gold); color:var(--ink); font-weight:700; font-size:14.5px;
+    background:var(--deep); color:var(--paper); font-weight:700; font-size:14.5px;
     cursor:pointer; letter-spacing:0.04em;
   }
   #bindView button:disabled{ opacity:0.6; }
-  #bindMsg{ font-size:12.5px; color:#e6a08a; margin-top:12px; text-align:center; min-height:16px; }
+  #bindMsg{ font-size:12.5px; color:var(--alert); margin-top:12px; text-align:center; min-height:16px; }
 </style>
 </head>
 <body>
