@@ -169,6 +169,28 @@
     font-size:10.5px; color:rgba(246,243,236,0.5);
     letter-spacing:0.05em;
   }
+
+  /* --- Loading / Error states --- */
+  #loadingView, #errorView{
+    display:none;
+    flex-direction:column; align-items:center; gap:14px;
+    color:#F6F3EC; text-align:center; padding:60px 24px;
+  }
+  #loadingView.show, #errorView.show{ display:flex; }
+  .spinner{
+    width:34px; height:34px; border-radius:50%;
+    border:3px solid rgba(246,243,236,0.25);
+    border-top-color:var(--gold);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #errorView .err-title{ font-size:16px; font-weight:700; }
+  #errorView .err-sub{ font-size:13px; color:rgba(246,243,236,0.65); line-height:1.6; }
+
+  .status.expired{ background:rgba(179,67,46,0.15); color:var(--alert); border-color:rgba(179,67,46,0.35); }
+  .status.expired .dot{ background:var(--alert); }
+  .card.invalid .head{ filter:grayscale(0.6); }
+  .card.invalid .photo{ filter:grayscale(0.8); }
 </style>
 </head>
 <body>
@@ -176,7 +198,19 @@
 <div class="stage">
   <div class="brand"><b>亞東科技大學</b> 護理系友會・電子會員證</div>
 
-  <div class="card">
+  <!-- 載入中畫面 -->
+  <div class="card" id="loadingView">
+    <div class="spinner"></div>
+    <div>正在驗證會員身份...</div>
+  </div>
+
+  <!-- 查無會員資料畫面 -->
+  <div class="card" id="errorView">
+    <div class="err-title">找不到會員資料</div>
+    <div class="err-sub" id="errorMsg">請確認您已完成入會申請並通過審核。<br>如有疑問請聯繫系友會管理員。</div>
+  </div>
+
+  <div class="card" id="mainCard" style="display:none;">
     <div class="punch"></div>
     <div class="head">
       <div class="assoc">FAR EASTERN UNIVERSITY NURSING ALUMNI</div>
@@ -187,19 +221,19 @@
     </div>
 
     <div class="body-area">
-      <div class="photo">陳</div>
-      <div class="name">陳○○</div>
-      <div class="subrole">第 12 屆・急診護理組</div>
+      <div class="photo" id="photo">陳</div>
+      <div class="name" id="name">陳○○</div>
+      <div class="subrole" id="subrole">第 12 屆・急診護理組</div>
 
-      <div class="status"><span class="dot"></span>有效會員 ACTIVE</div>
+      <div class="status" id="statusBadge"><span class="dot"></span><span id="statusText">有效會員 ACTIVE</span></div>
 
       <div class="divider"></div>
 
       <div class="info-grid">
-        <div><label>會員編號</label><span>FEU-A0142</span></div>
-        <div><label>入會年度</label><span>2023</span></div>
-        <div><label>會籍效期</label><span>2026.12.31</span></div>
-        <div><label>身份別</label><span>正式會員</span></div>
+        <div><label>會員編號</label><span id="memberId">FEU-A0142</span></div>
+        <div><label>入會年度</label><span id="joinYear">2023</span></div>
+        <div><label>會籍效期</label><span id="expiry">2026.12.31</span></div>
+        <div><label>身份別</label><span id="roleType">正式會員</span></div>
       </div>
 
       <div class="verify">
@@ -218,22 +252,108 @@
   </div>
 </div>
 
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
-  function genCode(){
-    // 以時間區間種子產生6碼動態碼，示意用（正式版由後端GAS依會員編號+時間戳雜湊產生）
-    const seed = Math.floor(Date.now()/5000);
+  // ===== 設定區：請將下面這行換成您GAS Web App部署後拿到的網址 =====
+  const GAS_API_URL = "請貼上您的GAS Web App網址";
+  const LIFF_ID = "2011085574-dzhAKIHb";
+  // ================================================================
+
+  function genCode(seedKey){
+    // 以「會員編號 + 時間區間」產生6碼動態碼，示意用簡易雜湊
+    // 正式環境建議改由GAS後端依相同規則產生，前端只負責顯示，降低被竄改風險
+    const seed = Math.floor(Date.now()/5000) + hashStr(seedKey || '');
     let x = seed;
     x = (x ^ (x << 13)) >>> 0; x = (x ^ (x >> 17)) >>> 0; x = (x ^ (x << 5)) >>> 0;
     const code = String(x % 1000000).padStart(6,'0');
     return code.slice(0,3) + ' ' + code.slice(3);
   }
+  function hashStr(s){
+    let h = 0;
+    for(let i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) >>> 0; }
+    return h;
+  }
+
+  let currentMemberId = '';
+
   function tick(){
-    document.getElementById('code').textContent = genCode();
+    document.getElementById('code').textContent = genCode(currentMemberId);
     const now = new Date();
     document.getElementById('clock').textContent = now.toLocaleTimeString('zh-TW', { hour12:false });
   }
-  tick();
-  setInterval(tick, 1000);
+
+  function showView(view){
+    ['loadingView','errorView','mainCard'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(id === view){ el.style.display = 'flex'; el.classList.add('show'); }
+      else { el.style.display = 'none'; el.classList.remove('show'); }
+    });
+    if(view === 'mainCard'){ document.getElementById('mainCard').style.display = 'block'; }
+  }
+
+  function renderMember(data){
+    currentMemberId = data.memberId || '';
+    document.getElementById('photo').textContent = (data.name || '').charAt(0);
+    document.getElementById('name').textContent = data.name || '';
+    document.getElementById('subrole').textContent = data.subrole || '';
+    document.getElementById('memberId').textContent = data.memberId || '';
+    document.getElementById('joinYear').textContent = data.joinYear || '';
+    document.getElementById('expiry').textContent = data.expiry || '';
+    document.getElementById('roleType').textContent = data.roleType || '正式會員';
+
+    const badge = document.getElementById('statusBadge');
+    const card = document.getElementById('mainCard');
+    if(data.status === 'active'){
+      badge.classList.remove('expired');
+      document.getElementById('statusText').textContent = '有效會員 ACTIVE';
+      card.classList.remove('invalid');
+    } else {
+      badge.classList.add('expired');
+      document.getElementById('statusText').textContent = '非有效會員 INACTIVE';
+      card.classList.add('invalid');
+    }
+
+    showView('mainCard');
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  async function fetchMemberData(lineUserId){
+    try{
+      const res = await fetch(`${GAS_API_URL}?userId=${encodeURIComponent(lineUserId)}`);
+      const data = await res.json();
+      if(data.found){
+        renderMember(data);
+      } else {
+        document.getElementById('errorMsg').innerHTML = '查無您的會員資料，請確認已完成入會申請並通過審核。<br>如有疑問請聯繫系友會管理員。';
+        showView('errorView');
+      }
+    }catch(err){
+      document.getElementById('errorMsg').innerHTML = '系統暫時無法連線，請稍後再試。<br>如持續發生請聯繫系友會管理員。';
+      showView('errorView');
+    }
+  }
+
+  function init(){
+    liff.init({ liffId: LIFF_ID }).then(() => {
+      if(!liff.isLoggedIn()){
+        liff.login();
+        return;
+      }
+      liff.getProfile().then(profile => {
+        fetchMemberData(profile.userId);
+      }).catch(() => {
+        document.getElementById('errorMsg').innerHTML = '無法取得LINE使用者資訊，請重新開啟此頁面。';
+        showView('errorView');
+      });
+    }).catch((err) => {
+      document.getElementById('errorMsg').innerHTML = 'LIFF初始化失敗，請確認網路連線後重新開啟。';
+      showView('errorView');
+    });
+  }
+
+  showView('loadingView');
+  init();
 </script>
 
 </body>
